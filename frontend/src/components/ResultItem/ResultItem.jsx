@@ -1,9 +1,11 @@
 import clsx from 'clsx';
 
 function highlight(text, query) {
-  if (!query) return text;
+  if (text === null || text === undefined) return null;
+  const str = String(text);
+  if (!query) return str;
   const re = new RegExp(`(${query.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
-  return text.split(re).map((chunk, i) =>
+  return str.split(re).map((chunk, i) =>
     re.test(chunk) ? (
       <mark key={i} className="bg-yellow-300 text-gray-900">
         {chunk}

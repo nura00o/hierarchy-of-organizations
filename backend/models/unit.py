@@ -11,7 +11,7 @@ class Unit(Base):
     name = Column(String, index=True, nullable=False)
     bin = Column(String(12), index=True, nullable=True)
     code = Column(String(20), index=True, nullable=True)
-    code_abp = Column(String(20), index=True, nullable=True)
+    code_abp = Column(Integer, index=True, nullable=True)
     parent_id = Column(Integer, ForeignKey("units.id"), index=True, nullable=True)
     level = Column(Integer, index=True, nullable=False)
     direct_children_count = Column(Integer, default=0)

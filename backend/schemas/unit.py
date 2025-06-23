@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,7 +10,7 @@ class UnitBase(BaseModel):
     name: str
     bin: Optional[str] = None
     code: Optional[str] = None
-    code_abp: Optional[str] = None
+    code_abp: Optional[Union[str, int]] = None
     parent_id: Optional[int] = None
     level: int
     direct_children_count: int

@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from sqlalchemy import Select, select, text
+from sqlalchemy import Select, select, text, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,76 +57,97 @@ async def search_units(
     limit: int,
     offset: int,
 ):
-    """Advanced fuzzy search with ranking.
+    """Advanced search that prioritises exact matches on `bin`, `code`, `code_abp`.
 
-    Ranking factors (higher is better):
-    1. **Exact equality**: the name matches the query exactly.
-    2. **Prefix match**: name starts with the query.
-    3. **`word_similarity` / `similarity`**: pg_trgm metrics.
-    4. **Position of match**: earlier appearances win.
-    5. **Shorter name**: slight boost to more concise matches.
+    1. Exact equality on bin/code/code_abp (in that order).
+    2. Fuzzy matching on `name` using existing ranking logic.
+    This guarantees that e.g. `code_abp = 201` appears before "Школа №201"."""
 
-    Requires PostgreSQL extensions:
-        CREATE EXTENSION IF NOT EXISTS pg_trgm;
-        CREATE INDEX IF NOT EXISTS idx_units_name_trgm ON units USING gin (name gin_trgm_ops);
-    """
+    # Ranking factors (higher is better):
+    # 1. Exact equality handled separately above.
+    # 2. Name prefix match.
+    # 3. Trigram similarity metrics (word_similarity / similarity).
+    # 4. Position of match – earlier is better.
+    # 5. Shorter names first.
 
-    if exact:
-        # Fast path for exact match – leverage B-Tree indices.
-        stmt = (
-            select(Unit)
-            .where(
-                (Unit.name == query)
-                | (Unit.bin == query)
-                | (Unit.code == query)
-                | (Unit.code_abp == query)
-            )
-            .limit(limit)
-            .offset(offset)
-        )
-        res = await session.execute(stmt)
-        return res.scalars().all()
+    # Note: Requires PostgreSQL extensions:
+    #   CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    #   CREATE INDEX IF NOT EXISTS idx_units_name_trgm ON units USING gin (name gin_trgm_ops);
 
-    # Flexible fuzzy search ranking using raw SQL for full control.
-    sql = text(
+    # -------------------------
+    # 1. Exact matches on codes
+    # -------------------------
+    filters = [Unit.bin == query, Unit.code == query]
+
+    # Attempt to interpret query as 32-bit integer for code_abp when reasonable.
+    if query.isdigit():
+        int_val = int(query)
+        # PostgreSQL `integer` is 32-bit; avoid overflow errors
+        if -2147483648 <= int_val <= 2147483647:
+            filters.append(Unit.code_abp == int_val)
+    # Always include string equality (legacy/edge cases)
+    filters.append(cast(Unit.code_abp, String) == query)  # type: ignore
+
+    exact_stmt = (
+        select(Unit)
+        .where(or_(*filters))
+        .order_by(Unit.name)
+    )
+    exact_res = await session.execute(exact_stmt)
+    exact_units = exact_res.scalars().unique().all()
+
+    # If we've satisfied the requested window – slice and return
+    combined: List[Unit] = exact_units
+    if len(combined) >= offset + limit:
+        return combined[offset : offset + limit]
+
+    # Calculate remaining rows to fetch from fuzzy search.
+    remaining = (offset + limit) - len(combined)
+
+    # ---------------------------------
+    # 2. Fuzzy search on the `name` field
+    # ---------------------------------
+
+    # Build a SELECT * FROM (...) fuzzy statement identical to previous but excluding already seen ids.
+    fuzzy_sql = text(
         """
         WITH q AS (
-            SELECT
-                lower(:q)                         AS qtxt,
-                lower(:like_q)                    AS like_q,
-                lower(:like_prefix)               AS like_prefix
+            SELECT lower(:q) AS qtxt,
+                   lower(:like_q) AS like_q,
+                   lower(:like_prefix) AS like_prefix
         )
         SELECT u.*
         FROM units u, q
         WHERE
-            -- Cheap prefix / substring checks (use text_pattern_ops index)
-            lower(u.name) LIKE q.like_q
-            OR similarity(u.name, q.qtxt) > 0.2
-            OR word_similarity(u.name, q.qtxt) > 0.2
+            lower(u.name) LIKE q.like_q OR
+            similarity(u.name, q.qtxt) > 0.2 OR
+            word_similarity(u.name, q.qtxt) > 0.2
         ORDER BY
-            -- 1. exact equality highest priority
             (lower(u.name) = q.qtxt) DESC,
-            -- 2. name starts with query
             (lower(u.name) LIKE q.like_prefix) DESC,
-            -- 3. combined trigram similarity metrics
             GREATEST(word_similarity(u.name, q.qtxt), similarity(u.name, q.qtxt)) DESC,
-            -- 4. earlier position of the query substring
             POSITION(q.qtxt IN lower(u.name)),
-            -- 5. shorter names first (more specific)
             length(u.name)
-        LIMIT :limit OFFSET :offset;
+        LIMIT :limit
+        OFFSET 0; -- offset already accounted for in combined list
         """
     )
+
+    seen_ids = {u.id for u in exact_units}
 
     params = {
         "q": query,
         "like_q": f"%{query.lower()}%",
         "like_prefix": f"{query.lower()}%",
-        "limit": limit,
-        "offset": offset,
+        "limit": remaining,
     }
 
-    res = await session.execute(sql, params)
-    rows = res.mappings().all()
-    # rows contain dicts with all Unit columns; convert to Unit model instances
-    return [Unit(**{k: v for k, v in r.items() if k in Unit.__table__.columns}) for r in rows]
+    fuzzy_res = await session.execute(fuzzy_sql, params)
+    fuzzy_rows = fuzzy_res.mappings().all()
+    fuzzy_units = [Unit(**{k: v for k, v in r.items() if k in Unit.__table__.columns}) for r in fuzzy_rows]
+
+    combined.extend([u for u in fuzzy_units if u.id not in seen_ids])
+    return combined[offset : offset + limit]
+
+
+
