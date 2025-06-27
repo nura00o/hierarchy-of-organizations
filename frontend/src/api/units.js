@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { config } from '../config';
 
 const api = axios.create({
-  baseURL: '/api/units',
+  baseURL: `${config.apiUrl}/units`,
 });
 
 export const searchUnits = async ({ query, exact = false, limit = 20, offset = 0 }) => {

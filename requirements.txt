@@ -1,0 +1,17 @@
+certifi==2025.6.15
+charset-normalizer==3.4.2
+click==8.2.1
+colorama==0.4.6
+h11==0.16.0
+idna==3.10
+requests==2.32.4
+urllib3==2.5.0
+uvicorn==0.34.3
+fastapi==0.110.0
+SQLAlchemy[asyncio]==2.0.29
+asyncpg==0.29.0
+pydantic==2.7.1
+python-dotenv==1.0.1
+pandas==2.2.2
+openpyxl==3.1.2
+httpx==0.25.2

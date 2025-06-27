@@ -1,8 +1,13 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routers.units import router as units_router
 from .routers.export import router as export_router
+from .routers.feedback import router as feedback_router
 
 app = FastAPI(title="Organization Hierarchy API", version="0.1.0")
 
@@ -17,6 +22,7 @@ app.add_middleware(
 
 app.include_router(units_router, prefix="/api")
 app.include_router(export_router, prefix="/api")
+app.include_router(feedback_router, prefix="/api")
 
 
 @app.get("/ping")

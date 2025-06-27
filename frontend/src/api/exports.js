@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { config } from '../config';
 
 export const downloadJson = async () => {
-  const res = await axios.get('/api/export/json', { responseType: 'blob' });
+  const res = await axios.get(`${config.apiUrl}/export/json`, { responseType: 'blob' });
   const url = window.URL.createObjectURL(res.data);
   const a = document.createElement('a');
   a.href = url;
@@ -11,7 +12,7 @@ export const downloadJson = async () => {
 };
 
 export const downloadExcel = async () => {
-  const res = await axios.get('/api/export/excel', { responseType: 'blob' });
+  const res = await axios.get(`${config.apiUrl}/export/excel`, { responseType: 'blob' });
   const url = window.URL.createObjectURL(res.data);
   const a = document.createElement('a');
   a.href = url;

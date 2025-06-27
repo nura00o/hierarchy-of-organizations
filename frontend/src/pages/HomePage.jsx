@@ -4,6 +4,7 @@ import SearchInput from '@/components/SearchInput/SearchInput';
 import SearchResultsList from '@/components/SearchResultsList/SearchResultsList';
 import TreeView from '@/components/TreeView/TreeView';
 import ExportMenu from '@/components/Export/ExportMenu';
+import FeedbackMenu from '@/components/Feedback/FeedbackMenu';
 import { searchUnits, fetchPath } from '@/api/units';
 
 export default function HomePage() {
@@ -122,6 +123,7 @@ export default function HomePage() {
         </div>
         <TreeView ref={treeViewRef} selectedId={selectedId} />
       </div>
+          <FeedbackMenu selectedUnit={selectedUnit} />
     </div>
   );
 }
