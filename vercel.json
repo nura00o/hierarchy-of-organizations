@@ -5,19 +5,13 @@
   "rewrites": [
     { 
       "source": "/api/(.*)", 
-      "destination": "/api/index.py" 
+      "destination": "/api" 
     },
     { 
       "source": "/(.*)", 
       "destination": "/" 
     }
   ],
-  "functions": {
-    "api/index.py": {
-      "runtime": "python@3.9",
-      "maxDuration": 60
-    }
-  },
   "env": {
     "PYTHONPATH": "."
   },
