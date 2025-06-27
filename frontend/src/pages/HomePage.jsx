@@ -3,6 +3,7 @@ import { ArrowTopRightOnSquareIcon, ClipboardIcon, CheckIcon } from '@heroicons/
 import SearchInput from '@/components/SearchInput/SearchInput';
 import SearchResultsList from '@/components/SearchResultsList/SearchResultsList';
 import TreeView from '@/components/TreeView/TreeView';
+import ExportMenu from '@/components/Export/ExportMenu';
 import { searchUnits, fetchPath } from '@/api/units';
 
 export default function HomePage() {
@@ -10,7 +11,8 @@ export default function HomePage() {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [copied, setCopied] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
-  const treeRef = useRef(null);
+  const treeViewRef = useRef(null); // imperative methods from TreeView
+  const treeContainerRef = useRef(null); // DOM element for PNG capture
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -40,7 +42,7 @@ export default function HomePage() {
     setCopied(false);
     try {
       const path = await fetchPath(itm.id);
-      treeRef.current?.showPath(path);
+      treeViewRef.current?.showPath(path);
     } catch (e) {
       console.error(e);
     }
@@ -61,7 +63,7 @@ export default function HomePage() {
           />
         )}
       </div>
-      <div className="bg-white rounded shadow p-2 overflow-auto space-y-2">
+      <div className="bg-white rounded shadow p-2 overflow-auto space-y-2" ref={treeContainerRef}>
         {selectedUnit && (
           <div className="p-2 border rounded bg-gray-50 space-y-1">
             <div className="flex items-center gap-2">
@@ -114,8 +116,11 @@ export default function HomePage() {
             )}
           </div>
         )}
-        <h2 className="font-semibold mb-2">Дерево иерархии</h2>
-        <TreeView ref={treeRef} selectedId={selectedId} />
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-semibold">Дерево иерархии</h2>
+          <ExportMenu treeContainerRef={treeContainerRef} />
+        </div>
+        <TreeView ref={treeViewRef} selectedId={selectedId} />
       </div>
     </div>
   );
